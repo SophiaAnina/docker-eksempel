@@ -18,6 +18,7 @@ Project folders:
 - `washworld_eksame_frontend_2026/` – the website
 - `washworld_eksamen_backend_2026/` – the Flask API
 - `db/init/01-schema.sql` – creates the database tables the first time the database starts
+- `db/seed/seed.sql` – example data (users, memberships, etc.), loaded by the `db-seed` service every time you start the app
 
 ## Getting started
 
@@ -86,6 +87,7 @@ docker compose down -v          # stop and DELETE the database data
 ## Good to know
 
 - The database tables are only created the first time. To start fresh, run `docker compose down -v` and start again.
+- The example data is added on every `docker compose up` and uses `INSERT IGNORE`, so existing rows are never duplicated or overwritten. Rows you delete from the seed data will come back on the next start.
 - Port 80 and 3000 must be free on your computer.
 
 ## Main API endpoints

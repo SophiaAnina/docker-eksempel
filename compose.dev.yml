@@ -56,6 +56,30 @@ services:
       retries: 10
       start_period: 30s
 
+  # One-shot job: loads db/seed/seed.sql on every `up` (INSERT IGNORE, so it is repeatable)
+  db-seed:
+    image: mariadb:10.6.20
+    container_name: washworld_dev_db_seed
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      MYSQL_PWD: ${DB_ROOT_PASSWORD:-password}
+    volumes:
+      - ./db/seed:/seed:ro
+    entrypoint:
+      - sh
+      - -c
+      - |
+        for i in $$(seq 1 30); do
+          mariadb -h mariadb -u root washworld_eksamen < /seed/seed.sql && echo "Seed data loaded" && exit 0
+          echo "Database not ready, retrying..."; sleep 3
+        done
+        exit 1
+    networks:
+      - washworld_dev_net
+    restart: "no"
+
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:5.2
     container_name: washworld_dev_phpmyadmin
