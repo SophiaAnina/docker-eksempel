@@ -610,6 +610,7 @@
   font-size: clamp(26px, 6.8vw, 34px);
   text-align: center;
   white-space: nowrap;
+ 
 }
 
 .menuChevron {

@@ -1,0 +1,80 @@
+name: washworld-dev
+
+services:
+  frontend:
+    build:
+      context: ./washworld_eksame_frontend_2026
+      dockerfile: Dockerfile.dev
+    container_name: washworld_dev_frontend
+    depends_on:
+      - web
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:80}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./washworld_eksame_frontend_2026:/app
+      # keep the container's node_modules and build cache instead of the host's
+      - frontend_node_modules:/app/node_modules
+      - frontend_next_cache:/app/.next
+    networks:
+      - washworld_dev_net
+
+  web:
+    build:
+      context: ./washworld_eksamen_backend_2026
+      dockerfile: Dockerfile.dev
+    container_name: washworld_dev_flask
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    ports:
+      - "80:5000"
+    volumes:
+      - ./washworld_eksamen_backend_2026:/app
+      - flask_sessions:/sessions
+    networks:
+      - washworld_dev_net
+
+  mariadb:
+    image: mariadb:10.6.20
+    container_name: washworld_dev_mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-password}
+      MARIADB_DATABASE: washworld_eksamen
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:3306:3306"
+    networks:
+      - washworld_dev_net
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:5.2
+    container_name: washworld_dev_phpmyadmin
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      PMA_HOST: mariadb
+    ports:
+      - "127.0.0.1:8080:80"
+    networks:
+      - washworld_dev_net
+
+networks:
+  washworld_dev_net:
+    driver: bridge
+
+volumes:
+  mariadb_data:
+  flask_sessions:
+  frontend_node_modules:
+  frontend_next_cache:

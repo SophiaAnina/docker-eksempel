@@ -1,129 +1,97 @@
-# Wash World – containerised application
+# Wash World
 
-A three-tier app run with Docker Compose:
+A small web app for a car wash company. Users can sign up, log in, see washing locations on a map, pick a membership, mark favorite locations, start a wash and see their wash history.
 
-| Service      | Tech                       | Host port            | Purpose |
-|--------------|----------------------------|----------------------|---------|
-| `frontend`   | Next.js 16 (Node 22 alpine)| 3000                 | Web UI |
-| `web`        | Flask (Python 3.12 alpine) | 80 (container: 5000) | REST API / backend |
-| `mariadb`    | MariaDB 10.6               | 127.0.0.1:3306       | Database |
-| `phpmyadmin` | phpMyAdmin 5.2             | 127.0.0.1:8080       | DB admin UI |
+Everything runs in Docker, so you only need Docker installed.
 
-Source: https://github.com/SophiaAnina/docker-eksempel
+## What's inside
 
-## What is used (and why)
+| Part | Technology | Address |
+|------|------------|---------|
+| Frontend (the website) | Next.js / React | http://localhost:3000 |
+| Backend (the API) | Python Flask | http://localhost:80 |
+| Database | MariaDB | `localhost:3306` (this machine only) |
+| Database viewer | phpMyAdmin | http://localhost:8080 (this machine only) |
 
-- **Multi-stage builds** – both Dockerfiles build/install dependencies in a throw-away stage and copy only the result into a small `alpine` runtime image (backend ≈ 110 MB, frontend uses Next.js `standalone` output).
-- **Rootless** – backend runs as `appuser` (uid 10001), frontend as `nextjs`; containers also use `cap_drop: ALL`, `no-new-privileges` and a read-only root filesystem (`/tmp` is a tmpfs).
-- **Volumes**
-  - `backend_mariadb_data` (named) – database files persist across `down`/`up`.
-  - `washworld_flask_sessions` (named) – Flask login sessions persist.
-  - `./washworld_eksamen_backend_2026 -> /app` (bind mount, read-only) – edit the code on the host and Flask reloads it.
-  - `./db/init -> /docker-entrypoint-initdb.d` – database schema loaded the first time the DB volume is empty.
-- **Named network** – all services share `washworld_net`; the backend reaches the DB by the host name `mariadb`.
-- **Resource limits** – CPU/memory limits per service (`deploy.resources.limits`).
-- **Health checks** – MariaDB and the backend have health checks; dependent services wait until they are healthy.
-- **Least exposure** – DB and phpMyAdmin are only published on `127.0.0.1`.
+Project folders:
 
-## Compose files
+- `washworld_eksame_frontend_2026/` – the website
+- `washworld_eksamen_backend_2026/` – the Flask API
+- `db/init/01-schema.sql` – creates the database tables the first time the database starts
 
-| File | Use |
-|------|-----|
-| `docker-compose.yml` | Base: all services, `washworld_net` network, named volumes, limits, hardening |
-| `docker-compose.override.yml` | **Dev**, loaded automatically by `docker compose up`: bind-mounts the backend code and enables Flask debug reload |
-| `docker-compose.prod.yml` | **Production-like**: baked code only, `restart: always`, log rotation, no DB port on the host, phpMyAdmin only with `--profile tools` |
-| `docker-compose.ngrok.yml` + `ngrok.yml` | Optional ngrok tunnels for the frontend and the API |
+## Getting started
 
-```bash
-docker compose up -d --build                                                         # dev
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build        # prod-like
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tools up -d  # + phpMyAdmin
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+2. Copy the example settings file:
+
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+
+3. Start everything:
+
+   ```powershell
+   docker compose up --build
+   ```
+
+4. Open http://localhost:3000 in your browser.
+
+To stop the app press `Ctrl+C`, or run `docker compose down`.
+
+## Settings (`.env`)
+
+| Variable | What it does |
+|----------|--------------|
+| `DB_ROOT_PASSWORD` | Database password. Must match the password in `washworld_eksamen_backend_2026/x.py`. |
+| `NEXT_PUBLIC_API_URL` | Address the browser uses to reach the API. Default: `http://localhost:80`. |
+| `NGROK_AUTHTOKEN` | Only needed if you use ngrok (see below). |
+
+If you change `NEXT_PUBLIC_API_URL`, rebuild with `docker compose up --build`.
+
+## Ways to run it
+
+**Normal run** (`docker compose up`): the backend reloads automatically when you edit its code.
+
+**Development with hot reload for both parts** (frontend and backend):
+
+```powershell
+docker compose -f compose.dev.yml up --build
 ```
 
-## Run it
+**Production-like run** (no debug mode, no database port, phpMyAdmin off):
 
-Requirements: Docker Desktop / Docker Engine with Compose v2.
-
-```bash
-git clone https://github.com/SophiaAnina/docker-eksempel.git
-cd docker-eksempel
-cp .env.example .env        # Windows PowerShell: Copy-Item .env.example .env
-docker compose up -d --build
-docker compose ps           # wait until mariadb and web are "healthy"
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-Open:
+Add `--profile tools` to also start phpMyAdmin.
 
-- App: http://localhost:3000
-- API: http://localhost:80
-- phpMyAdmin: http://localhost:8080 (user `root`, password from `.env`, default `password`)
+**Share it publicly with ngrok** (for demos): put your token in `.env`, then:
 
-Stop:
-
-```bash
-docker compose down        # keeps the volumes (data is kept)
-docker compose down -v     # also deletes the volumes (fresh database next time)
-```
-
-Useful commands: `docker compose logs -f web`, `docker compose build --no-cache`, `docker compose exec mariadb mariadb -uroot -p`.
-
-> The database credentials (`root` / `password`, database `washworld_eksamen`, host `mariadb`) are hardcoded in the backend (`x.py`), so `DB_ROOT_PASSWORD` in `.env` must stay `password`. For a real deployment, read them from environment variables/secrets instead.
-
-## Test the Dockerfiles individually
-
-```bash
-docker build -t washworld/backend ./washworld_eksamen_backend_2026
-docker build -t washworld/frontend --build-arg NEXT_PUBLIC_API_URL=http://localhost:80 ./washworld_eksame_frontend_2026
-docker run --rm washworld/backend id          # shows uid 10001 (not root)
-```
-
-## Change the application dynamically
-
-1. `docker compose up -d`
-2. Edit any file in `washworld_eksamen_backend_2026/` (e.g. a route in `app.py` or a template). Flask runs with `FLASK_DEBUG=1` and reloads automatically – check `docker compose logs -f web` and refresh the browser.
-3. Data changes survive `docker compose down` followed by `docker compose up -d` because of the named DB volume.
-
-The frontend is a production build; after changing frontend code run `docker compose up -d --build frontend`. `NEXT_PUBLIC_API_URL` is baked into the frontend at build time, so rebuild when it changes.
-
-## Monitor resource usage
-
-```bash
-docker stats                                  # live CPU / memory / network
-docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}"
-```
-
-Typical idle numbers: Flask ≈ 70 MB, MariaDB ≈ 65 MB, Next.js ≈ 35 MB, phpMyAdmin ≈ 15 MB — all well below their limits (256–512 MB).
-
-## Optional: remote access
-
-**SSH port forwarding** (run the stack on a remote machine, view it locally):
-
-```bash
-ssh -L 3000:127.0.0.1:3000 -L 80:127.0.0.1:80 you@your_remote
-```
-
-Then open http://localhost:3000. The browser calls the API on `localhost:80`, so both ports are forwarded.
-
-**ngrok** (public demo): the browser must reach the API too, so both are tunnelled (`ngrok.yml`) and the frontend is rebuilt with the API's public URL:
-
-```bash
-# 1. put your token in .env:  NGROK_AUTHTOKEN=...
+```powershell
 docker compose -f docker-compose.yml -f docker-compose.ngrok.yml up -d ngrok
-# 2. open http://localhost:4040 and copy the public https URL of the "api" tunnel
-# 3. put it in .env:  NEXT_PUBLIC_API_URL=https://<api-tunnel>.ngrok-free.app
-docker compose -f docker-compose.yml -f docker-compose.ngrok.yml up -d --build frontend
-# 4. share the public https URL of the "frontend" tunnel (shown in http://localhost:4040)
 ```
 
-## Project layout
+Open http://localhost:4040 to see the public URLs. Set `NEXT_PUBLIC_API_URL` to the public API URL and rebuild.
 
+## Useful commands
+
+```powershell
+docker compose logs -f web      # watch backend logs
+docker compose ps               # see what is running
+docker compose down             # stop everything
+docker compose down -v          # stop and DELETE the database data
 ```
-docker-compose.yml                      # services, network, volumes, limits
-docker-compose.override.yml             # dev overrides (auto-loaded)
-docker-compose.prod.yml                 # production-like overrides
-docker-compose.ngrok.yml, ngrok.yml     # optional public tunnel
-.env.example                            # copy to .env
-db/init/01-schema.sql                   # DB schema (no data) loaded on first start
-washworld_eksamen_backend_2026/         # Flask API + Dockerfile (multi-stage, non-root)
-washworld_eksame_frontend_2026/         # Next.js UI + Dockerfile (multi-stage, non-root)
-```
+
+## Good to know
+
+- The database tables are only created the first time. To start fresh, run `docker compose down -v` and start again.
+- Port 80 and 3000 must be free on your computer.
+
+## Main API endpoints
+
+- Account: `/api-signup`, `/api-login`, `/forgot-password`, `/reset-password`, `/api-delete-account`
+- Profile: `/api-my-info`, `/api-update-my-info`
+- Memberships: `/api-memberships`, `/api-my-membership`, `/api-update-my-membership`
+- Washing: `/api-start-wash`, `/api-my-wash-history`
+- Favorites: `/api-favorites`

@@ -1,0 +1,21 @@
+FROM python:3.12-alpine
+WORKDIR /app
+
+ENV FLASK_APP=app.py \
+    FLASK_DEBUG=1 \
+    FLASK_RUN_HOST=0.0.0.0 \
+    FLASK_RUN_PORT=5000 \
+    SESSION_FILE_DIR=/sessions \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && mkdir -p /sessions
+
+# Source code is bind-mounted at runtime; this copy is only a fallback
+COPY . .
+
+EXPOSE 5000
+# Debug mode starts the Werkzeug reloader, which restarts Flask when a .py file changes
+CMD ["flask", "run", "--reload"]
