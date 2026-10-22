@@ -262,12 +262,7 @@ def get_memberships():
     finally:
         if "cursor" in locals(): cursor.close()
         if "db" in locals(): db.close()
-######################## LOGIN
-# @app.get("/login")
-# def show_login():
-#     return render_template("page_login.html")
 
-##################################################### 
 @app.post("/api-login")
 def login():
     try:
@@ -275,12 +270,6 @@ def login():
       
         
         user_password = x.validate_user_password(request.json.get("user_password", ""))
-       
-       
-        # ic(user_email)
-
-        
-        # ic(user_password)
         
         db, cursor = x.db()
         q = "SELECT * FROM users WHERE user_email = %s LIMIT 1"
