@@ -43,7 +43,7 @@ services:
     ports:
       - "80:5000" # host port 80 -> container port 5000 (the container runs as non-root)
     volumes:
-      - flask_sessions:/app/flask_session # named volume: sessions survive restarts
+      - flask_sessions:/sessions # named volume: sessions survive restarts
     networks:
       - washworld_net
     restart: unless-stopped

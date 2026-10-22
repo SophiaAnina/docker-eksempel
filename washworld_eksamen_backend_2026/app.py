@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, send_from_directory
+import os
 import uuid
 import x
 import time
@@ -19,6 +20,7 @@ ic.configureOutput(prefix=f"_____ | ", includeContext=True)
 app = Flask(__name__)
 CORS(app)  # allows everything
 app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_FILE_DIR'] = os.environ.get('SESSION_FILE_DIR', 'flask_session')
 Session(app)
 app.config["JWT_SECRET_KEY"] = "password"
 jwt = JWTManager(app)

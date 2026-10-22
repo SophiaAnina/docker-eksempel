@@ -12,13 +12,16 @@ WORKDIR /app
 ENV FLASK_APP=app.py \
     FLASK_RUN_HOST=0.0.0.0 \
     FLASK_RUN_PORT=5000 \
+    SESSION_FILE_DIR=/sessions \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 COPY --from=builder /install /usr/local
 
-# Non-root user; flask_session is writable so it can be mounted as a volume
+# Non-root user; /sessions lives outside /app so it can be mounted as a volume
+# even when /app is a read-only bind mount (dev override)
 RUN adduser -D -u 10001 appuser \
-    && mkdir -p /app/flask_session \
+    && mkdir -p /sessions \
+    && chown appuser:appuser /sessions \
     && chown -R appuser:appuser /app
 COPY --chown=appuser:appuser . .
 USER appuser

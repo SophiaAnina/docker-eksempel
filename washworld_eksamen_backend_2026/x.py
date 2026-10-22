@@ -19,7 +19,7 @@ def db():
         db = mysql.connector.connect(
             host = "mariadb",
             user = "root",  
-            password = '${DB_ROOT_PASSWORD}',
+            password = 'password',
             database = "washworld_eksamen"
         )
         cursor = db.cursor(dictionary=True)
